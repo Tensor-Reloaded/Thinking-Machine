@@ -87,18 +87,24 @@ class TM(nn.Module):
         self.a_m = AnsMachine()
 
     def forward(self, mini_batch):
+        #todo different forward for train and eval
+
         mini_batch = self.base_module(mini_batch)
         outputs = []
         all_conf = []
         all_a = []
         all_q = []
+        all_f_cls = []
+
         for x in mini_batch:
             x = x.unsqueeze(0)
             depth = 0
             current_confs = []
             current_as = []
             current_qs = []
+            current_classes = []
             while depth < self.max_depth:
+                current_classes.append(self.f_cls(x))
                 current_conf = self.conf_eval(x)
                 current_confs.append(current_conf)
 
@@ -112,20 +118,33 @@ class TM(nn.Module):
 
                 x = x + a
                 depth += 1
-            # print("====DEPTH : ", depth)
-            outputs.append(self.f_cls(x))
+            final_class = self.f_cls(x)
+
+            current_classes.append(final_class)
+            outputs.append(final_class)
+
 
             all_conf.append(torch.cat(current_confs))
 
             if depth:
                 all_q.append(torch.cat(current_qs))
                 all_a.append(torch.cat(current_as))
+                all_f_cls.append(torch.cat(current_classes))
             else:
                 all_q.append([])
                 all_a.append([])
+                all_f_cls.append([])
 
-        return torch.cat(outputs), \
-               torch.cat(all_conf), \
-               (all_q), \
-               (all_a)
+        return  torch.cat(outputs), \
+                all_conf, \
+                all_q, \
+                all_a, \
+                all_f_cls
+
+
+
+
+
+
+
 
