@@ -7,7 +7,7 @@ import torch.backends.cudnn as cudnn
 
 from tm.thinking_machine import TM as Net
 
-
+from tm.loss_utils import compute_losses
 import torchvision
 import torchvision.transforms as transforms
 
@@ -75,13 +75,16 @@ def train(epoch):
         targets = targets.to(device)
         outputs, all_conf, all_q, all_a, all_f_cls = net(inputs)
 
-        loss = criterion(outputs, targets)
+        conf_eval_losses, f_cls_losses, q_m_losses, a_m_losses = compute_losses(outputs, all_conf, all_f_cls)
+        # loss = criterion(outputs, targets)
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        # optimizer.zero_grad()
+        # loss.backward()
+        # optimizer.step()
+        #
+        # train_loss += loss.item()
+        #
 
-        train_loss += loss.item()
         _, predicted = outputs.max(1)
         total += targets.size(0)
         correct += predicted.eq(targets).sum().item()
