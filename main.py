@@ -13,6 +13,8 @@ import torchvision.transforms as transforms
 
 import argparse
 
+
+
 parser = argparse.ArgumentParser(description='cifar10 classification models')
 parser.add_argument('--lr', default=0.1, help='')
 parser.add_argument('--resume', default=None, help='')
@@ -58,8 +60,9 @@ if args.resume is not None:
     net.load_state_dict(checkpoint['net'])
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(net.parameters(), lr=0.1,
-                      momentum=0.9, weight_decay=1e-4)
+# optimizer = optim.SGD(net.parameters(), lr=0.1,
+#                       momentum=0.9, weight_decay=1e-4)
+optimizer = optim.Adam(net.parameters() , lr = 0.01)
 step_lr_scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[150, 225], gamma=0.1)
 
 
@@ -75,12 +78,17 @@ def train(epoch):
         targets = targets.to(device)
         outputs, all_conf, all_q, all_a, all_f_cls = net(inputs)
 
-        conf_eval_losses, f_cls_losses, q_m_losses, a_m_losses = compute_losses(outputs, all_conf, all_f_cls)
+        conf_eval_losses, f_cls_losses, q_m_losses, a_m_losses = compute_losses(outputs, targets, all_conf, all_f_cls)
         # loss = criterion(outputs, targets)
+        optimizer.zero_grad()
+        conf_eval_losses[0].backward(retain_graph = True)
+        f_cls_losses[0].mean().backward(retain_graph = True)
+        q_m_losses[0].mean().backward(retain_graph = True)
+        a_m_losses[0].mean().backward(retain_graph = True)
 
-        # optimizer.zero_grad()
+
         # loss.backward()
-        # optimizer.step()
+        optimizer.step()
         #
         # train_loss += loss.item()
         #

@@ -142,7 +142,7 @@ class TM(nn.Module):
             else:
                 all_q.append([])
                 all_a.append([])
-                all_f_cls.append([])
+                all_f_cls.append(torch.cat(current_classes))
 
         if not self.training:
             return torch.cat(outputs)
