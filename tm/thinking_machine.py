@@ -23,6 +23,7 @@ class BaseModule(nn.Module):
 
         return x
 
+
 class FinalClassifier(nn.Module):
     def __init__(self):
         super().__init__()
@@ -32,7 +33,8 @@ class FinalClassifier(nn.Module):
     def forward(self, x):
         x = x.view(x.size()[0], -1)
         x = self.fc1(x)
-        return self.sm(x)
+        # return self.sm(x)
+        return x
 
 
 class ConfidenceEval(nn.Module):
@@ -48,7 +50,7 @@ class ConfidenceEval(nn.Module):
         x = self.max_pool1(x)
         x = x.view(x.size(0), -1)
         x = self.fc1(x)
-        return F.sigmoid(x)
+        return torch.sigmoid(x)
 
 class QueryMachine(nn.Module):
     def __init__(self):
@@ -70,13 +72,13 @@ class AnsMachine(nn.Module):
     def forward(self, x, q):
         unified = torch.cat((q, x), dim=1)
 
-        return F.tanh(self.conv1(unified))
+        return torch.tanh(self.conv1(unified))
 
 
 
 
 class TM(nn.Module):
-    def __init__(self, conf_threshold = 0.9, max_depth= 3):
+    def __init__(self, conf_threshold = 0.9, max_depth = 8):
         super().__init__()
         self.base_module = BaseModule()
         self.max_depth = max_depth
@@ -109,7 +111,6 @@ class TM(nn.Module):
                     current_confs.append(current_conf)
                     current_classes.append(self.f_cls(x))
 
-
                 if current_conf >= self.conf_threshold:
                     break
 
@@ -131,7 +132,6 @@ class TM(nn.Module):
                 continue
             
             current_classes.append(final_class)
-
 
             all_conf.append(torch.cat(current_confs))
 

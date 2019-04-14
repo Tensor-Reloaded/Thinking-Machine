@@ -23,13 +23,7 @@ def compute_f_cls_losses(targets, all_f_cls, criterion, repeat_label = False):
     for label, predicted_labels in zip(list(targets), all_f_cls):
         if repeat_label:
             # print(len(predicted_labels))
-            try:
-                label = label.repeat(len(predicted_labels))
-            except Exception:
-                print(label)
-                print(len(predicted_labels))
-                sys.exit(1)
-
+            label = label.repeat(len(predicted_labels))
 
         losses.append(criterion(predicted_labels, label))
 
@@ -77,7 +71,7 @@ def compute_conf_eval_losses(all_conf, all_f_cls_outputs):
     # because a high value would mean a high error, which means a very low confidence
     # todo either change from confidence evaluator to lack-of-confidence evaluator, or find the right way to formulate the loss
     losses = []
-    criterion = nn.MSELoss()
+    criterion = nn.MSELoss(reduction='none')
     for current_sample_confs, f_cls_output in zip(all_conf, all_f_cls_outputs):
         losses.append(criterion(current_sample_confs, f_cls_output))
     return losses
