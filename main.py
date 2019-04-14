@@ -19,7 +19,8 @@ import argparse
 def train(epoch):
     net.train()
 
-    train_loss = 0
+    train_cls_loss = 0
+    train_conf_loss = 0
     correct = 0
     total = 0
 
@@ -27,25 +28,9 @@ def train(epoch):
         inputs = inputs.to(device)
         targets = targets.to(device)
 
-        all_f_cls, all_confs, actual_depth = net(inputs)
-
-        only_valid_f_cls = []
-        only_valid_confs = []
-        outputs = []
-
-        all_f_cls = torch.stack(all_f_cls).transpose(0, 1)
-        all_confs = torch.stack(all_confs).transpose(0, 1)
-
-        for sample_idx in range(len(targets)):
-
-            only_valid_f_cls.append(all_f_cls[sample_idx, : actual_depth[sample_idx]])
-            only_valid_confs.append(all_confs[sample_idx, : actual_depth[sample_idx]])
-
-            outputs.append(all_f_cls[sample_idx, actual_depth[sample_idx] - 1, :])
-
-        outputs = torch.stack(outputs)
+        outputs, all_f_cls, all_confs, actual_depth = net(inputs)
         conf_eval_losses, f_cls_losses, q_m_losses, a_m_losses = compute_losses(targets, all_confs, all_f_cls)
-        # loss = criterion(outputs, targets)
+        
         optimizer.zero_grad()
 
         backward(net=net,
@@ -55,17 +40,18 @@ def train(epoch):
                  a_m_losses=a_m_losses)
 
         optimizer.step()
-        #
-        # train_loss += loss.item()
-        #
+
+        train_cls_loss += f_cls_losses[-1].sum()
+        train_conf_loss += conf_eval_losses[-1].sum()
 
         _, predicted = outputs.max(1)
         total += targets.size(0)
         correct += predicted.eq(targets).sum().item()
-        if batch_idx % 10 == 0:
-            print('epoch : {} [{}/{}]| loss: {:.3f} | acc: {:.3f}'.format(epoch, batch_idx,
+        if batch_idx % 20 == 0:
+            print('epoch : {} [{}/{}]| cls loss: {:.3f} | conf loss: {:.3f} | acc: {:.3f}'.format(epoch, batch_idx,
                                                                           len(train_loader),
-                                                                          train_loss / (batch_idx + 1),
+                                                                          train_cls_loss / (batch_idx + 1),
+                                                                          train_conf_loss / (batch_idx + 1),
                                                                           100. * correct / total))
 
 

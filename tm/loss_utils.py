@@ -21,8 +21,7 @@ def compute_f_cls_losses(targets, all_f_cls, criterion, repeat_label = False):
     losses = []
 
     for label, predicted_labels in zip(list(targets), all_f_cls):
-        if repeat_label:
-            # print(len(predicted_labels))
+        if repeat_label:            
             label = label.repeat(len(predicted_labels))
 
         losses.append(criterion(predicted_labels, label))
