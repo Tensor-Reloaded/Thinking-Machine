@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 import sys
-def compute_losses(outputs, targets, all_confs, all_f_cls):
+def compute_losses(targets, all_confs, all_f_cls):
     # each loss can be computed independently, and only when you backprop it should you make sure you compute the gradient
     # only on the corresponding weights
     f_cls_losses = compute_f_cls_losses_for_f_cls(targets, all_f_cls)

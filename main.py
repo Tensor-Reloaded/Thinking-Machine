@@ -26,9 +26,25 @@ def train(epoch):
     for batch_idx, (inputs, targets) in enumerate(train_loader):
         inputs = inputs.to(device)
         targets = targets.to(device)
-        outputs, all_conf, all_q, all_a, all_f_cls = net(inputs)
 
-        conf_eval_losses, f_cls_losses, q_m_losses, a_m_losses = compute_losses(outputs, targets, all_conf, all_f_cls)
+        all_f_cls, all_confs, actual_depth = net(inputs)
+
+        only_valid_f_cls = []
+        only_valid_confs = []
+        outputs = []
+
+        all_f_cls = torch.stack(all_f_cls).transpose(0, 1)
+        all_confs = torch.stack(all_confs).transpose(0, 1)
+
+        for sample_idx in range(len(targets)):
+
+            only_valid_f_cls.append(all_f_cls[sample_idx, : actual_depth[sample_idx]])
+            only_valid_confs.append(all_confs[sample_idx, : actual_depth[sample_idx]])
+
+            outputs.append(all_f_cls[sample_idx, actual_depth[sample_idx] - 1, :])
+
+        outputs = torch.stack(outputs)
+        conf_eval_losses, f_cls_losses, q_m_losses, a_m_losses = compute_losses(targets, all_confs, all_f_cls)
         # loss = criterion(outputs, targets)
         optimizer.zero_grad()
 
@@ -133,7 +149,7 @@ if __name__ == '__main__':
                'dog', 'frog', 'horse', 'ship', 'truck')
 
     print('==> Making model..')
-    net = Net()
+    net = Net(device)
     net = net.to(device)
     if device == 'cuda':
         # net = torch.nn.DataParallel(net)
