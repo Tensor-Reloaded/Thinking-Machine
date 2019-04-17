@@ -78,8 +78,9 @@ class AnsMachine(nn.Module):
 
 
 class TM(nn.Module):
-    def __init__(self, conf_threshold = 0.9, max_depth = 8):
+    def __init__(self, device, conf_threshold = 0.95, max_depth= 5):
         super().__init__()
+        self.device = device
         self.base_module = BaseModule()
         self.max_depth = max_depth
         self.conf_threshold = conf_threshold
@@ -91,72 +92,58 @@ class TM(nn.Module):
     def forward(self, mini_batch):
         #todo different forward for train and eval
 
-        mini_batch = self.base_module(mini_batch)
-        outputs = []
-        all_conf = []
-        all_a = []
-        all_q = []
+        all_confs = []
         all_f_cls = []
 
-        for x in mini_batch:
-            x = x.unsqueeze(0)
-            depth = 0
-            current_confs = []
-            current_as = []
-            current_qs = []
-            current_classes = []
-            while depth < self.max_depth:
-                current_conf = self.conf_eval(x)  
-                if self.training: # We only have to log intermediary classifications when training 
-                    current_confs.append(current_conf)
-                    current_classes.append(self.f_cls(x))
+        batch_size = len(mini_batch)
 
-                if current_conf >= self.conf_threshold:
-                    break
+        actual_depth = torch.ones(batch_size, device=self.device, dtype=torch.long) * self.max_depth
 
-                q = self.q_m(x)
-                a = self.a_m(x, q)
+        x = self.base_module(mini_batch)
 
-                if self.training: 
-                    current_qs.append(q)
-                    current_as.append(a)
+        depth = 0
 
-                x = x + a
-                depth += 1
+        while depth < self.max_depth and actual_depth.max() == self.max_depth:
+            depth += 1
+            current_confs = self.conf_eval(x)
+            current_f_cls = self.f_cls(x)
+            acceptable_conf = (( current_confs.squeeze() > self.conf_threshold).nonzero()).view(-1)
 
-            final_class = self.f_cls(x) # TODO: refactor to use the last classification from the while loop aka. 1 less f_cls(x) call, probably done with an "else" at the "while" loop above
+            # print(acceptable_conf)
 
-            outputs.append(final_class)
+            depth_tensor = torch.ones(len(acceptable_conf), device= self.device, dtype=torch.long) * depth
+            actual_depth[acceptable_conf] = torch.min(input = actual_depth[acceptable_conf], other = depth_tensor)
 
-            if not self.training:
-                continue
-            
-            current_classes.append(final_class)
+            all_confs.append(current_confs)
+            all_f_cls.append(current_f_cls)
 
-            all_conf.append(torch.cat(current_confs))
+            q = self.q_m(x)
+            a = self.a_m(x, q)
 
-            if depth and self.training: # TODO: Refactor the appends in a cleaner version based on self.training
-                all_q.append(torch.cat(current_qs))
-                all_a.append(torch.cat(current_as))
-                all_f_cls.append(torch.cat(current_classes))
-            else:
-                all_q.append([])
-                all_a.append([])
-                all_f_cls.append(torch.cat(current_classes))
+            x = x + a
 
-        if not self.training:
-            return torch.cat(outputs)
+        only_valid_f_cls = []
+        only_valid_confs = []
+        outputs = []
 
-        return  torch.cat(outputs), \
-                all_conf, \
-                all_q, \
-                all_a, \
-                all_f_cls
+        all_f_cls = torch.stack(all_f_cls).transpose(0, 1)
+        all_confs = torch.stack(all_confs).transpose(0, 1).squeeze(-1)
 
+        for sample_idx in range(batch_size):
+            if actual_depth[sample_idx]==0:
+                print(actual_depth[sample_idx])
+                #exit()
+            only_valid_f_cls.append(all_f_cls[sample_idx, : actual_depth[sample_idx]])
+            only_valid_confs.append(all_confs[sample_idx, : actual_depth[sample_idx]])
 
+            outputs.append(all_f_cls[sample_idx, actual_depth[sample_idx] - 1, :])
+        outputs = torch.stack(outputs)
 
+        #return all_f_cls, all_confs, actual_depth
 
-
-
+        if self.training:
+            return outputs, only_valid_f_cls, only_valid_confs, actual_depth
+        else:
+            return outputs
 
 
