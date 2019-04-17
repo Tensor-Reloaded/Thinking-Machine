@@ -161,7 +161,15 @@ if __name__ == '__main__':
     criterion = nn.CrossEntropyLoss()
     # optimizer = optim.SGD(net.parameters(), lr=0.1,
     #                       momentum=0.9, weight_decay=1e-4)
-    optimizer = optim.Adam(net.parameters() , lr = 0.001)
+    optimizer = optim.Adam(
+        [
+            {"params" : net.base_module.parameters(), 'lr' : 0.01},
+            {"params" : net.f_cls.parameters(), 'lr' : 0.1},
+            {"params" : net.conf_eval.parameters(), 'lr' : 0.005},
+            {"params" : net.q_m.parameters(), 'lr' : 0.1},
+            {"params" : net.a_m.parameters(), 'lr' : 0.1},
+        ],
+    )
     step_lr_scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[150, 225], gamma=0.1)
 
     best_acc = 0
