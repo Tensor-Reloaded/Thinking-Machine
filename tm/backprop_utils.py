@@ -17,6 +17,7 @@ def backward(net: TM, conf_eval_losses, final_classifier_losses, q_m_losses, a_m
     # Final classifier: should only use the loss at the last layer for each sample
     _set_requires_grad(net, False)
     _set_requires_grad(net.f_cls, True)
+    _set_requires_grad(net.base_module, True)
 
     total_final_classifier_loss = sum(fc_loss[-1] for fc_loss in final_classifier_losses)/len(final_classifier_losses)
 
