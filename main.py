@@ -12,7 +12,6 @@ from tm.thinking_machine import TM as Net
 from tm.loss_utils import compute_losses
 import torchvision
 import torchvision.transforms as transforms
-
 import argparse
 
 
@@ -21,38 +20,52 @@ def train(epoch):
 
     train_cls_loss = 0
     train_conf_loss = 0
+    train_a_m_loss = 0
+    train_q_m_loss = 0
     correct = 0
     total = 0
 
     for batch_idx, (inputs, targets) in enumerate(train_loader):
+        optimizer.zero_grad()
+
         inputs = inputs.to(device)
         targets = targets.to(device)
 
         outputs, all_f_cls, all_confs, actual_depth = net(inputs)
         conf_eval_losses, f_cls_losses, q_m_losses, a_m_losses = compute_losses(targets, all_confs, all_f_cls)
-        
-        optimizer.zero_grad()
 
-        backward(net=net,
-                 conf_eval_losses=conf_eval_losses,
-                 final_classifier_losses=f_cls_losses,
-                 q_m_losses=q_m_losses,
-                 a_m_losses=a_m_losses)
+        total_conf_eval_loss, \
+        total_final_classifier_loss, \
+        total_a_m_loss, \
+        total_q_m_loss = backward( net=net,
+                                   conf_eval_losses=conf_eval_losses,
+                                   final_classifier_losses=f_cls_losses,
+                                   q_m_losses=q_m_losses,
+                                   a_m_losses=a_m_losses,
+        )
 
         optimizer.step()
 
-        train_cls_loss += f_cls_losses[-1].sum()
-        train_conf_loss += conf_eval_losses[-1].sum()
+        train_cls_loss += total_final_classifier_loss
+        train_conf_loss += total_conf_eval_loss
+        train_a_m_loss += total_a_m_loss
+        train_q_m_loss += total_q_m_loss
 
         _, predicted = outputs.max(1)
         total += targets.size(0)
         correct += predicted.eq(targets).sum().item()
+
         if batch_idx % 20 == 0:
-            print('epoch : {} [{}/{}]| cls loss: {:.3f} | conf loss: {:.3f} | acc: {:.3f}'.format(epoch, batch_idx,
-                                                                          len(train_loader),
-                                                                          train_cls_loss / (batch_idx + 1),
-                                                                          train_conf_loss / (batch_idx + 1),
-                                                                          100. * correct / total))
+            print('epoch : {} [{}/{}]| cls loss: {:.3f} | conf loss: {:.3f} | a loss: {:.3f} | q loss: {:.3f} | acc: {:.3f}'
+                  .format(epoch,
+                          batch_idx,
+                          len(train_loader),
+                          train_cls_loss / (batch_idx + 1),
+                          train_conf_loss / (batch_idx + 1),
+                          train_a_m_loss / (batch_idx + 1),
+                          train_q_m_loss / (batch_idx + 1),
+                          100. * correct / total),
+            )
 
 
 def test(epoch, best_acc):
