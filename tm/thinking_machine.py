@@ -78,7 +78,7 @@ class AnsMachine(nn.Module):
 
 
 class TM(nn.Module):
-    def __init__(self, device, conf_threshold = 0.95, max_depth= 50):
+    def __init__(self, device, conf_threshold = 0.95, max_depth= 5):
         super().__init__()
         self.device = device
         self.base_module = BaseModule()
@@ -127,7 +127,7 @@ class TM(nn.Module):
         outputs = []
 
         all_f_cls = torch.stack(all_f_cls).transpose(0, 1)
-        all_confs = torch.stack(all_confs).transpose(0, 1)
+        all_confs = torch.stack(all_confs).transpose(0, 1).squeeze(-1)
 
         for sample_idx in range(batch_size):
             if actual_depth[sample_idx]==0:
