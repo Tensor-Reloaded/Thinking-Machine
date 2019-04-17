@@ -48,7 +48,7 @@ def compute_conf_increase_loss(all_conf):
 
         prev_conf = 1.0
         for conf in confs_of_one_sample:
-            current_sample_losses.append(prev_conf - conf)
+            current_sample_losses.append((prev_conf - conf).unsqueeze(0))
             prev_conf = conf
 
         losses.append(torch.cat(current_sample_losses))
@@ -70,7 +70,7 @@ def compute_conf_eval_losses(all_conf, all_f_cls_outputs):
     # because a high value would mean a high error, which means a very low confidence
     # todo either change from confidence evaluator to lack-of-confidence evaluator, or find the right way to formulate the loss
     losses = []
-    criterion = nn.MSELoss(reduction='none')
+    criterion = nn.L1Loss(reduction='none')
     for current_sample_confs, f_cls_output in zip(all_conf, all_f_cls_outputs):
         losses.append(criterion(current_sample_confs, f_cls_output))
     return losses
