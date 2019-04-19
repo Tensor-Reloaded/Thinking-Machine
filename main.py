@@ -5,7 +5,7 @@ import torch.optim as optim
 from torch.optim import lr_scheduler
 import torch.backends.cudnn as cudnn
 
-from tm.backprop_utils import backward
+from tm.backprop_utils import BackpropManager
 from tm.learn_utils import reset_seed
 from tm.thinking_machine import TM as Net
 
@@ -15,15 +15,12 @@ import torchvision.transforms as transforms
 import argparse
 
 
-def train(epoch):
+def train(epoch,backward:BackpropManager):
     net.train()
 
-    train_cls_loss = 0
-    train_conf_loss = 0
-    train_a_m_loss = 0
-    train_q_m_loss = 0
     correct = 0
     total = 0
+    print_freq = 10
 
     for batch_idx, (inputs, targets) in enumerate(train_loader):
         optimizer.zero_grad()
@@ -31,41 +28,36 @@ def train(epoch):
         inputs = inputs.to(device)
         targets = targets.to(device)
 
-        outputs, all_f_cls, all_confs, actual_depth = net(inputs)
+
+        outputs, all_f_cls, all_confs, actual_depth = net(inputs, batch_idx % print_freq == 0)
         conf_eval_losses, f_cls_losses, q_m_losses, a_m_losses = compute_losses(targets, all_confs, all_f_cls)
 
-        total_conf_eval_loss, \
-        total_final_classifier_loss, \
-        total_a_m_loss, \
-        total_q_m_loss = backward( net=net,
-                                   conf_eval_losses=conf_eval_losses,
-                                   final_classifier_losses=f_cls_losses,
-                                   q_m_losses=q_m_losses,
-                                   a_m_losses=a_m_losses,
+        loss = backward.step(
+            {
+                'cls':f_cls_losses,
+                'conf':conf_eval_losses,
+                'q_a':q_m_losses,
+            }
         )
 
         optimizer.step()
 
-        train_cls_loss += total_final_classifier_loss
-        train_conf_loss += total_conf_eval_loss
-        train_a_m_loss += total_a_m_loss
-        train_q_m_loss += total_q_m_loss
 
-        _, predicted = outputs.max(1)
-        total += targets.size(0)
-        correct += predicted.eq(targets).sum().item()
+        if batch_idx % print_freq == 0:
+            _, predicted = outputs.max(1)
+            total += targets.size(0)
+            correct += predicted.eq(targets).sum().item()
 
-        if batch_idx % 20 == 0:
-            print('epoch : {} [{}/{}]| cls loss: {:.3f} | conf loss: {:.3f} | a loss: {:.3f} | q loss: {:.3f} | acc: {:.3f}'
+            print('epoch : {} [{}/{}]| {} loss: {:.3f} | acc: {:.3f}'
                   .format(epoch,
                           batch_idx,
                           len(train_loader),
-                          train_cls_loss / (batch_idx + 1),
-                          train_conf_loss / (batch_idx + 1),
-                          train_a_m_loss / (batch_idx + 1),
-                          train_q_m_loss / (batch_idx + 1),
+                          backward.current_module,
+                          sum(backward.modules_history[backward.current_module]) / (0.0001 + len(backward.modules_history[backward.current_module])),
                           100. * correct / total),
             )
+            print("CONFS: {:.4f}".format(all_confs.mean().item()))
+            print("CONF_INCREASE: {:.4f}".format(q_m_losses.mean().item()))
 
 
 def test(epoch, best_acc):
@@ -86,12 +78,6 @@ def test(epoch, best_acc):
             _, predicted = outputs.max(1)
             total += targets.size(0)
             correct += predicted.eq(targets).sum().item()
-
-            if batch_idx % 10 == 0:
-                print('epoch : {} [{}/{}]| loss: {:.3f} | acc: {:.3f}'.format(epoch, batch_idx,
-                                                                              len(test_loader),
-                                                                              test_loss / (batch_idx + 1),
-                                                                              100 * correct / total))
 
     acc = 100 * correct / total
 
@@ -161,16 +147,33 @@ if __name__ == '__main__':
     criterion = nn.CrossEntropyLoss()
     # optimizer = optim.SGD(net.parameters(), lr=0.1,
     #                       momentum=0.9, weight_decay=1e-4)
-    optimizer = optim.Adam(
+
+    # optimizer = optim.Adam(net.parameters(), lr = 0.001)
+    optimizer = optim.SGD(
         [
-            {"params" : net.base_module.parameters(), 'lr' : 0.01},
-            {"params" : net.f_cls.parameters(), 'lr' : 0.1},
-            {"params" : net.conf_eval.parameters(), 'lr' : 0.005},
-            {"params" : net.q_m.parameters(), 'lr' : 0.1},
-            {"params" : net.a_m.parameters(), 'lr' : 0.1},
+            {"params" : net.base_module.parameters(), 'lr' : 0.001},
+            {"params" : net.f_cls.parameters(), 'lr' : 0.001},
+            {"params" : net.conf_eval.parameters(), 'lr' : 0.001},
+            {"params" : net.q_m.parameters(), 'lr' : 0.001},
+            {"params" : net.a_m.parameters(), 'lr' : 0.001},
         ],
     )
     step_lr_scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[150, 225], gamma=0.1)
+    backward = BackpropManager(
+        net,
+        (len(train_loader)*1),0.0001,len(train_loader)*2,
+        (len(train_loader)*1)//2,0.0001,len(train_loader)*2,
+        (len(train_loader)*1)//2,0.0001,len(train_loader)*2,
+        current_module='conf',
+        verbose=True,
+    )
+    # backward = BackpropManager(
+    #     net,
+    #     (len(train_loader)*1),0.05,len(train_loader)*5,
+    #     (len(train_loader)*0)//2,0.005,len(train_loader)*2,
+    #     (len(train_loader)*0)//2,0.005,len(train_loader)*2,
+    #     verbose=True,
+    # )
 
     best_acc = 0
     if args.resume is not None:
@@ -178,6 +181,6 @@ if __name__ == '__main__':
     else:
         for epoch in range(300):
             step_lr_scheduler.step()
-            train(epoch)
+            train(epoch,backward)
             best_acc = test(epoch, best_acc)
             print('best test accuracy is ', best_acc)
