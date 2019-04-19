@@ -8,11 +8,11 @@ def compute_losses(targets, all_confs, all_f_cls):
     # f_cls_losses_for_conf_eval = compute_f_cls_loss_for_conf_eval(targets, all_f_cls)
     conf_eval_losses = compute_conf_eval_losses(all_confs, f_cls_losses)
     conf_delta = all_confs[:, :-1] - all_confs[:, 1:]
-    # from_depth_1_f_cls_loss = f_cls_losses.view(all_confs.size(0), all_confs.size(1) + 1)
-    # q_m_losses = from_depth_1_f_cls_loss[:,1:]
-    # a_m_losses = from_depth_1_f_cls_loss[:,1:]
-    q_m_losses = conf_delta
-    a_m_losses = conf_delta
+    from_depth_1_f_cls_loss = torch.autograd.Variable(f_cls_losses.view(all_confs.size(0), all_confs.size(1) + 1), requires_grad=True)
+    q_m_losses = from_depth_1_f_cls_loss[:,1:]
+    a_m_losses = from_depth_1_f_cls_loss[:,1:]
+    # q_m_losses = conf_delta
+    # a_m_losses = conf_delta
     return conf_eval_losses, \
            f_cls_losses, \
            q_m_losses, \

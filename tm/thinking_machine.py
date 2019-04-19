@@ -33,8 +33,8 @@ class FinalClassifier(nn.Module):
     def forward(self, x):
         x = x.view(x.size()[0], -1)
         x = self.fc1(x)
-        # return self.sm(x)
-        return x
+        return self.sm(x)
+        # return x
 
 
 class ConfidenceEval(nn.Module):
@@ -55,11 +55,13 @@ class ConfidenceEval(nn.Module):
 class QueryMachine(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d(32, 16, 1)
+        self.conv1 = nn.Conv2d(32, 64, 1)
+        self.conv2 = nn.Conv2d(64, 16, 1)
         # self.max_pool = nn.MaxPool2d(kernel_size=3)
 
     def forward(self, x):
-        x = self.conv1(x)
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
         # x = F.relu(x)
         # x = self.max_pool(x)
         return x
@@ -67,18 +69,21 @@ class QueryMachine(nn.Module):
 class AnsMachine(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d(32 + 16, 32, kernel_size=1)
-
+        self.conv1 = nn.Conv2d(32 + 16, 64, kernel_size=1)
+        self.conv2 = nn.Conv2d(64, 32, kernel_size=1)
+        self.batch_norm = nn.BatchNorm2d(32)
     def forward(self, x, q):
         unified = torch.cat((q, x), dim=1)
-
-        return torch.tanh((self.conv1(unified)))
+        unified = F.relu(self.conv1(unified))
+        unified = F.relu(self.conv2(unified))
+        unified = self.batch_norm(unified)
+        return torch.tanh(unified)
 
 
 
 
 class TM(nn.Module):
-    def __init__(self, device, conf_threshold = 0.0, max_depth= 10):
+    def __init__(self, device, conf_threshold = 0.0, max_depth= 15):
         super().__init__()
         self.device = device
         self.base_module = BaseModule()

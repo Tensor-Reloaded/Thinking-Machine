@@ -47,7 +47,7 @@ class BackpropManager:
         self._set_requires_grad()
 
         loss = modules_losses[self.current_module].mean()
-        loss.backward()
+        loss.backward(retain_graph = True)
         loss = loss.item()
         if len(self.modules_history[self.current_module]) >= self.modules_max_epoch[self.current_module]:
             self._change_module()

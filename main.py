@@ -103,7 +103,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='cifar10 classification models')
     parser.add_argument('--lr', default=0.1, help='')
     parser.add_argument('--resume', default=None, help='')
-    parser.add_argument('--batch_size', default=128, help='')
+    parser.add_argument('--batch_size', default=256, help='')
     parser.add_argument('--num_worker', default=4, help='')
     args = parser.parse_args()
 
@@ -149,7 +149,7 @@ if __name__ == '__main__':
     #                       momentum=0.9, weight_decay=1e-4)
 
     # optimizer = optim.Adam(net.parameters(), lr = 0.001)
-    optimizer = optim.SGD(
+    optimizer = optim.Adam(
         [
             {"params" : net.base_module.parameters(), 'lr' : 0.001},
             {"params" : net.f_cls.parameters(), 'lr' : 0.001},
