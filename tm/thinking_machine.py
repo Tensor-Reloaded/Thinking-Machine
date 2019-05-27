@@ -33,16 +33,16 @@ class FinalClassifier(nn.Module):
     def forward(self, x):
         x = x.view(x.size()[0], -1)
         x = self.fc1(x)
-        # return self.sm(x)
-        return x
+        return self.sm(x)
+        # return x
 
 
 class ConfidenceEval(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d(32, 64, 1)
+        self.conv1 = nn.Conv2d(32, 16, 1)
         self.max_pool1 = nn.MaxPool2d(kernel_size=2)
-        self.fc1 = nn.Linear(1024, 1)
+        self.fc1 = nn.Linear(256, 1)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -50,16 +50,18 @@ class ConfidenceEval(nn.Module):
         x = self.max_pool1(x)
         x = x.view(x.size(0), -1)
         x = self.fc1(x)
-        return torch.sigmoid(x)
+        return torch.tanh(x)
 
 class QueryMachine(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d(32, 16, 1)
+        self.conv1 = nn.Conv2d(32, 64, 1)
+        self.conv2 = nn.Conv2d(64, 16, 1)
         # self.max_pool = nn.MaxPool2d(kernel_size=3)
 
     def forward(self, x):
-        x = self.conv1(x)
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
         # x = F.relu(x)
         # x = self.max_pool(x)
         return x
@@ -67,18 +69,21 @@ class QueryMachine(nn.Module):
 class AnsMachine(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d(32 + 16, 32, kernel_size=1)
-
+        self.conv1 = nn.Conv2d(32 + 16, 64, kernel_size=1)
+        self.conv2 = nn.Conv2d(64, 32, kernel_size=1)
+        self.batch_norm = nn.BatchNorm2d(32)
     def forward(self, x, q):
         unified = torch.cat((q, x), dim=1)
-
-        return torch.tanh(self.conv1(unified))
+        unified = F.relu(self.conv1(unified))
+        unified = F.relu(self.conv2(unified))
+        unified = self.batch_norm(unified)
+        return torch.tanh(unified)
 
 
 
 
 class TM(nn.Module):
-    def __init__(self, device, conf_threshold = 0.95, max_depth= 5):
+    def __init__(self, device, conf_threshold = 0.0, max_depth= 15):
         super().__init__()
         self.device = device
         self.base_module = BaseModule()
@@ -89,7 +94,7 @@ class TM(nn.Module):
         self.q_m = QueryMachine()
         self.a_m = AnsMachine()
 
-    def forward(self, mini_batch):
+    def forward(self, mini_batch, compute_outputs = True):
         #todo different forward for train and eval
 
         all_confs = []
@@ -103,11 +108,13 @@ class TM(nn.Module):
 
         depth = 0
 
-        while depth < self.max_depth and actual_depth.max() == self.max_depth:
+        while depth < self.max_depth and (self.training or actual_depth.max() == self.max_depth):
             depth += 1
             current_confs = self.conf_eval(x)
+
+            # print("CONF: ",current_confs.mean())
             current_f_cls = self.f_cls(x)
-            acceptable_conf = (( current_confs.squeeze() > self.conf_threshold).nonzero()).view(-1)
+            acceptable_conf = (( current_confs.squeeze() < self.conf_threshold).nonzero()).view(-1)
 
             # print(acceptable_conf)
 
@@ -122,27 +129,21 @@ class TM(nn.Module):
 
             x = x + a
 
-        only_valid_f_cls = []
-        only_valid_confs = []
+        if self.training:
+            all_f_cls.append(self.f_cls(x))
+
         outputs = []
 
         all_f_cls = torch.stack(all_f_cls).transpose(0, 1)
         all_confs = torch.stack(all_confs).transpose(0, 1).squeeze(-1)
 
-        for sample_idx in range(batch_size):
-            if actual_depth[sample_idx]==0:
-                print(actual_depth[sample_idx])
-                #exit()
-            only_valid_f_cls.append(all_f_cls[sample_idx, : actual_depth[sample_idx]])
-            only_valid_confs.append(all_confs[sample_idx, : actual_depth[sample_idx]])
-
-            outputs.append(all_f_cls[sample_idx, actual_depth[sample_idx] - 1, :])
-        outputs = torch.stack(outputs)
-
-        #return all_f_cls, all_confs, actual_depth
+        if compute_outputs:
+            for sample_idx in range(batch_size):
+                outputs.append(all_f_cls[sample_idx, actual_depth[sample_idx] - 1, :])
+            outputs = torch.stack(outputs)
 
         if self.training:
-            return outputs, only_valid_f_cls, only_valid_confs, actual_depth
+            return outputs, all_f_cls, all_confs, actual_depth
         else:
             return outputs
 
