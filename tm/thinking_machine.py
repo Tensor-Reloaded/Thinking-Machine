@@ -14,10 +14,10 @@ class BaseModule(nn.Module):
 
     def forward(self, x):
         x = self.conv1(x)
-        x = F.relu(x)
+        x = torch.relu(x)
         x = self.max_pool1(x)
         x = self.conv2(x)
-        x = F.relu(x)
+        x = torch.relu(x)
         x = self.max_pool2(x)
         x = self.conv3(x)
 
@@ -44,11 +44,11 @@ class ConfidenceEval(nn.Module):
 
     def forward(self, x):
         x = self.conv1(x)
-        x = F.relu(x)
+        x = torch.relu(x)
         x = self.max_pool1(x)
         x = x.view(x.size(0), -1)
         x = self.fc1(x)
-        return F.sigmoid(x)
+        return torch.sigmoid(x)
 
 class QueryMachine(nn.Module):
     def __init__(self):
@@ -58,7 +58,7 @@ class QueryMachine(nn.Module):
 
     def forward(self, x):
         x = self.conv1(x)
-        # x = F.relu(x)
+        # x = torch.relu(x)
         # x = self.max_pool(x)
         return x
 
@@ -70,7 +70,7 @@ class AnsMachine(nn.Module):
     def forward(self, x, q):
         unified = torch.cat((q, x), dim=1)
 
-        return F.tanh(self.conv1(unified))
+        return torch.tanh(self.conv1(unified))
 
 
 
