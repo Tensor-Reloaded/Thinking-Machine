@@ -14,10 +14,10 @@ class BaseModule(nn.Module):
 
     def forward(self, x):
         x = self.conv1(x)
-        x = F.relu(x)
+        x = torch.relu(x)
         x = self.max_pool1(x)
         x = self.conv2(x)
-        x = F.relu(x)
+        x = torch.relu(x)
         x = self.max_pool2(x)
         x = self.conv3(x)
 
@@ -46,7 +46,7 @@ class ConfidenceEval(nn.Module):
 
     def forward(self, x):
         x = self.conv1(x)
-        x = F.relu(x)
+        x = torch.relu(x)
         x = self.max_pool1(x)
         x = x.view(x.size(0), -1)
         x = self.fc1(x)
@@ -60,9 +60,9 @@ class QueryMachine(nn.Module):
         # self.max_pool = nn.MaxPool2d(kernel_size=3)
 
     def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        # x = F.relu(x)
+        x = self.conv1(x)
+        # x = torch.relu(x)
+
         # x = self.max_pool(x)
         return x
 
